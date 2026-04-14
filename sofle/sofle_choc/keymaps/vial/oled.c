@@ -1,4 +1,11 @@
+#include <stdio.h>
+
 oled_rotation_t oled_init_user(oled_rotation_t rotation) { return OLED_ROTATION_270; }
+
+bool     dynamic_keymap_macro_is_active(uint8_t id);
+uint32_t dynamic_keymap_macro_active_mask(void);
+bool     dynamic_keymap_macro_loop_active(void);
+uint8_t  dynamic_keymap_macro_looping_id(void);
 
 void render_space(void) {
     oled_write_P(PSTR("     "), false);
@@ -296,8 +303,71 @@ void render_layer_state(void) {
     }
 }
 
+static inline char macro_state_glyph(uint8_t macro_id, uint32_t active_mask, bool loop_active, uint8_t looping_id) {
+    if (loop_active && macro_id == looping_id) {
+        return 'L';
+    }
 
-static void render_logo(void) {
+    if (((active_mask & (1UL << macro_id)) != 0) || dynamic_keymap_macro_is_active(macro_id)) {
+        return '*';
+    }
+
+    return '.';
+}
+
+static void render_macro_state(void) {
+    char macro_line[22];
+
+    const uint32_t active_mask = dynamic_keymap_macro_active_mask();
+    const bool     loop_active = dynamic_keymap_macro_loop_active();
+    const uint8_t  looping_id  = dynamic_keymap_macro_looping_id();
+
+    // L = currently looping macro, * = active macro, . = inactive macro
+    snprintf(macro_line, sizeof(macro_line), "M:%c%c%c%c%c %c%c%c%c",
+             macro_state_glyph(0, active_mask, loop_active, looping_id),
+             macro_state_glyph(1, active_mask, loop_active, looping_id),
+             macro_state_glyph(2, active_mask, loop_active, looping_id),
+             macro_state_glyph(3, active_mask, loop_active, looping_id),
+             macro_state_glyph(4, active_mask, loop_active, looping_id),
+             macro_state_glyph(5, active_mask, loop_active, looping_id),
+             macro_state_glyph(6, active_mask, loop_active, looping_id),
+             macro_state_glyph(7, active_mask, loop_active, looping_id),
+             macro_state_glyph(8, active_mask, loop_active, looping_id));
+
+    oled_write_ln(macro_line, false);
+}
+
+static void render_macro_tiles_slave(void) {
+    const uint32_t active_mask = dynamic_keymap_macro_active_mask();
+    const bool     loop_active = dynamic_keymap_macro_loop_active();
+    const uint8_t  looping_id  = dynamic_keymap_macro_looping_id();
+    char           macro_label[5];
+
+    oled_set_cursor(0, 1);
+    oled_write_P(PSTR("macro status"), false);
+
+    oled_set_cursor(0, 3);
+    for (uint8_t macro_id = 0; macro_id < 4; macro_id++) {
+        const bool is_active = (loop_active && macro_id == looping_id) || macro_state_glyph(macro_id, active_mask, loop_active, looping_id) != '.';
+        snprintf(macro_label, sizeof(macro_label), " M%u ", macro_id);
+        oled_write(macro_label, is_active);
+        oled_write_P(PSTR(" "), false);
+    }
+
+    oled_set_cursor(0, 5);
+    for (uint8_t macro_id = 4; macro_id < 8; macro_id++) {
+        const bool is_active = (loop_active && macro_id == looping_id) || macro_state_glyph(macro_id, active_mask, loop_active, looping_id) != '.';
+        snprintf(macro_label, sizeof(macro_label), " M%u ", macro_id);
+        oled_write(macro_label, is_active);
+        oled_write_P(PSTR(" "), false);
+    }
+
+    oled_set_cursor(0, 7);
+    oled_write_P(PSTR(" M8 "), macro_state_glyph(8, active_mask, loop_active, looping_id) != '.');
+}
+
+
+__attribute__((unused)) static void render_logo(void) {
 // logo图像，在https://joric.github.io/qle/生成，需要做成32*128大小的，然后把“static const unsigned char”改成“static const char”
     static const char PROGMEM raw_logo[] ={
         0,128, 64, 64,  0, 64, 64,128,  0,  0,  0,128, 64, 32, 16,  8,  4,  2,  2,  2,  2,  2,  2,  2,  4, 12, 24,224,  0,  0,  0,  0, 31, 32, 32,224,  0,192,224,249,250,253,253,254,252,240,224,192,128,128,  0,  0,  0,  0,  0,  0,  0,  0,  0,159,  0,  0,  0,  0,  0,  0,254,  1,255,255,255,255,255,255,255,255,255,255,127,127, 63, 63, 63, 31, 31, 31, 14, 14,  6,  2,  0,  3,  2,  4, 56,  0,128, 64, 33, 22, 25,  7, 15, 15, 15,195,225,225,240,240,240,240,248,248,248,248,248,248,248,240,240,224,192,128,  0,240, 14,  0,
@@ -322,12 +392,13 @@ bool oled_task_user(void) {
         render_luna(0, 1);
         oled_set_cursor(0, 5);
         render_layer_state();
+        oled_set_cursor(0, 8);
+        render_macro_state();
         oled_set_cursor(0, 10);
         render_mod_status_gui_alt(get_mods()|get_oneshot_mods());
         render_mod_status_ctrl_shift(get_mods()|get_oneshot_mods());
     } else {
-        render_logo();  // Renders a static logo
+        render_macro_tiles_slave();
     }
     return false;
 }
-
