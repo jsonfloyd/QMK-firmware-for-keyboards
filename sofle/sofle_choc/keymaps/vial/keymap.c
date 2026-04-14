@@ -21,6 +21,82 @@
 #include QMK_KEYBOARD_H
 #include "oled.c"
 
+// Macro activity APIs are provided by core dynamic keymap support.
+bool     dynamic_keymap_macro_is_active(uint8_t id);
+uint32_t dynamic_keymap_macro_active_mask(void);
+bool     dynamic_keymap_macro_loop_active(void);
+uint8_t  dynamic_keymap_macro_looping_id(void);
+
+#if defined(RGB_MATRIX_ENABLE) || defined(LED_MATRIX_ENABLE)
+#    define MACRO_HIGHLIGHT_COUNT 9
+
+typedef struct {
+    uint8_t macro_id;
+    uint8_t led_index;
+} macro_led_map_t;
+
+/*
+ * Macro-to-LED mapping for M0..M8.
+ * Adjust `macro_led_map` if you want macro highlights on different keys.
+ */
+static const macro_led_map_t macro_led_map[MACRO_HIGHLIGHT_COUNT] = {
+    {0, 0},  // M0
+    {1, 1},  // M1
+    {2, 2},  // M2
+    {3, 3},  // M3
+    {4, 4},  // M4
+    {5, 29}, // M5
+    {6, 30}, // M6
+    {7, 31}, // M7
+    {8, 32}, // M8
+};
+
+static inline bool macro_id_is_active(uint8_t macro_id, uint32_t active_mask) {
+    return ((active_mask & (1UL << macro_id)) != 0) || dynamic_keymap_macro_is_active(macro_id);
+}
+#endif
+
+#ifdef RGB_MATRIX_ENABLE
+bool rgb_matrix_indicators_user(void) {
+    const uint32_t active_mask = dynamic_keymap_macro_active_mask();
+    const bool     loop_active = dynamic_keymap_macro_loop_active();
+    const uint8_t  looping_id  = dynamic_keymap_macro_looping_id();
+
+    for (uint8_t i = 0; i < MACRO_HIGHLIGHT_COUNT; i++) {
+        const uint8_t macro_id = macro_led_map[i].macro_id;
+        if (!macro_id_is_active(macro_id, active_mask)) {
+            continue;
+        }
+
+        const uint8_t led_index = macro_led_map[i].led_index;
+        if (loop_active && macro_id == looping_id) {
+            rgb_matrix_set_color(led_index, 255, 40, 0); // Looping macro: orange
+        } else {
+            rgb_matrix_set_color(led_index, 0, 255, 96); // Active macro: green
+        }
+    }
+
+    return false;
+}
+#endif
+
+#ifdef LED_MATRIX_ENABLE
+bool led_matrix_indicators_user(void) {
+    const uint32_t active_mask = dynamic_keymap_macro_active_mask();
+
+    for (uint8_t i = 0; i < MACRO_HIGHLIGHT_COUNT; i++) {
+        const uint8_t macro_id = macro_led_map[i].macro_id;
+        if (!macro_id_is_active(macro_id, active_mask)) {
+            continue;
+        }
+
+        led_matrix_set_value(macro_led_map[i].led_index, UINT8_MAX);
+    }
+
+    return false;
+}
+#endif
+
 // Default keymap. This can be changed in Vial. Use oled.c to change beavior that Vial cannot change.
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
@@ -166,4 +242,3 @@ const uint8_t PROGMEM encoder_hand_swap_config[NUM_ENCODERS] = {1, 0};
 #    endif
 
 #endif
-
