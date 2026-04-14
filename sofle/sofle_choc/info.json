@@ -1,5 +1,8 @@
 {
     "manufacturer": "PandaKB.COM",
+    "processor": "RP2040",
+    "bootloader": "tinyuf2",
+
     "keyboard_name": "Sofle Choc",
     "maintainer": "PandaKB.COM",
     "diode_direction": "COL2ROW",
