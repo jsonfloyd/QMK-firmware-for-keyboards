@@ -57,7 +57,7 @@ static inline bool macro_id_is_active(uint8_t macro_id, uint32_t active_mask) {
 #endif
 
 #ifdef RGB_MATRIX_ENABLE
-void rgb_matrix_indicators_user(void) {
+bool rgb_matrix_indicators_user(void) {
     const uint32_t active_mask = dynamic_keymap_macro_active_mask();
     const bool     loop_active = dynamic_keymap_macro_loop_active();
     const uint8_t  looping_id  = dynamic_keymap_macro_looping_id();
@@ -75,11 +75,13 @@ void rgb_matrix_indicators_user(void) {
             rgb_matrix_set_color(led_index, 0, 255, 96); // Active macro: green
         }
     }
+
+    return false;
 }
 #endif
 
 #ifdef LED_MATRIX_ENABLE
-void led_matrix_indicators_user(void) {
+bool led_matrix_indicators_user(void) {
     const uint32_t active_mask = dynamic_keymap_macro_active_mask();
 
     for (uint8_t i = 0; i < MACRO_HIGHLIGHT_COUNT; i++) {
@@ -90,6 +92,8 @@ void led_matrix_indicators_user(void) {
 
         led_matrix_set_value(macro_led_map[i].led_index, UINT8_MAX);
     }
+
+    return false;
 }
 #endif
 
