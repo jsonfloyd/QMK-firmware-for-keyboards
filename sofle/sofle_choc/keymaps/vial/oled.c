@@ -383,6 +383,8 @@ bool oled_task_user(void) {
         render_luna(0, 1);
         oled_set_cursor(0, 5);
         render_layer_state();
+        oled_set_cursor(0, 8);
+        render_macro_state();
         oled_set_cursor(0, 10);
         render_mod_status_gui_alt(get_mods()|get_oneshot_mods());
         render_mod_status_ctrl_shift(get_mods()|get_oneshot_mods());
