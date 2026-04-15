@@ -1,4 +1,21 @@
+#include <stdio.h>
+
 oled_rotation_t oled_init_user(oled_rotation_t rotation) { return OLED_ROTATION_270; }
+
+bool     dynamic_keymap_macro_is_active(uint8_t id);
+uint32_t dynamic_keymap_macro_active_mask(void);
+bool     dynamic_keymap_macro_loop_active(void);
+uint8_t  dynamic_keymap_macro_looping_id(void);
+static void render_macro_tiles_slave(void);
+
+/*
+ * Compatibility shim:
+ * Keep this helper so older call sites still compile if they reference
+ * `render_macro_state()` while the implementation has moved to tile rendering.
+ */
+__attribute__((unused)) static void render_macro_state(void) {
+    render_macro_tiles_slave();
+}
 
 void render_space(void) {
     oled_write_P(PSTR("     "), false);
@@ -296,8 +313,52 @@ void render_layer_state(void) {
     }
 }
 
+static inline bool macro_is_active(uint8_t macro_id, uint32_t active_mask, bool loop_active, uint8_t looping_id) {
+    if (loop_active && macro_id == looping_id) {
+        return true;
+    }
 
-static void render_logo(void) {
+    return ((active_mask & (1UL << macro_id)) != 0) || dynamic_keymap_macro_is_active(macro_id);
+}
+
+static void render_macro_tile(uint8_t macro_id, uint32_t active_mask, bool loop_active, uint8_t looping_id) {
+    char       macro_label[4];
+    const bool is_active = macro_is_active(macro_id, active_mask, loop_active, looping_id);
+
+    snprintf(macro_label, sizeof(macro_label), "M%u", macro_id);
+    oled_write_P(PSTR("["), false);
+    oled_write(macro_label, is_active);
+    oled_write_P(PSTR("]"), false);
+}
+
+static void render_macro_tiles_slave(void) {
+    const uint32_t active_mask = dynamic_keymap_macro_active_mask();
+    const bool     loop_active = dynamic_keymap_macro_loop_active();
+    const uint8_t  looping_id  = dynamic_keymap_macro_looping_id();
+
+    oled_set_cursor(0, 1);
+    oled_write_P(PSTR(" macro dashboard "), false);
+
+    oled_set_cursor(0, 3);
+    for (uint8_t macro_id = 0; macro_id < 4; macro_id++) {
+        render_macro_tile(macro_id, active_mask, loop_active, looping_id);
+        oled_write_P(PSTR(" "), false);
+    }
+
+    oled_set_cursor(0, 5);
+    for (uint8_t macro_id = 4; macro_id < 8; macro_id++) {
+        render_macro_tile(macro_id, active_mask, loop_active, looping_id);
+        oled_write_P(PSTR(" "), false);
+    }
+
+    oled_set_cursor(0, 7);
+    oled_write_P(PSTR("       "), false);
+    render_macro_tile(8, active_mask, loop_active, looping_id);
+    oled_write_P(PSTR("       "), false);
+}
+
+
+__attribute__((unused)) static void render_logo(void) {
 // logo图像，在https://joric.github.io/qle/生成，需要做成32*128大小的，然后把“static const unsigned char”改成“static const char”
     static const char PROGMEM raw_logo[] ={
         0,128, 64, 64,  0, 64, 64,128,  0,  0,  0,128, 64, 32, 16,  8,  4,  2,  2,  2,  2,  2,  2,  2,  4, 12, 24,224,  0,  0,  0,  0, 31, 32, 32,224,  0,192,224,249,250,253,253,254,252,240,224,192,128,128,  0,  0,  0,  0,  0,  0,  0,  0,  0,159,  0,  0,  0,  0,  0,  0,254,  1,255,255,255,255,255,255,255,255,255,255,127,127, 63, 63, 63, 31, 31, 31, 14, 14,  6,  2,  0,  3,  2,  4, 56,  0,128, 64, 33, 22, 25,  7, 15, 15, 15,195,225,225,240,240,240,240,248,248,248,248,248,248,248,240,240,224,192,128,  0,240, 14,  0,
@@ -326,8 +387,7 @@ bool oled_task_user(void) {
         render_mod_status_gui_alt(get_mods()|get_oneshot_mods());
         render_mod_status_ctrl_shift(get_mods()|get_oneshot_mods());
     } else {
-        render_logo();  // Renders a static logo
+        render_macro_tiles_slave();
     }
     return false;
 }
-
