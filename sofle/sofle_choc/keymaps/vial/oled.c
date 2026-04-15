@@ -6,6 +6,16 @@ bool     dynamic_keymap_macro_is_active(uint8_t id);
 uint32_t dynamic_keymap_macro_active_mask(void);
 bool     dynamic_keymap_macro_loop_active(void);
 uint8_t  dynamic_keymap_macro_looping_id(void);
+static void render_macro_tiles_slave(void);
+
+/*
+ * Compatibility shim:
+ * Keep this helper so older call sites still compile if they reference
+ * `render_macro_state()` while the implementation has moved to tile rendering.
+ */
+__attribute__((unused)) static void render_macro_state(void) {
+    render_macro_tiles_slave();
+}
 
 void render_space(void) {
     oled_write_P(PSTR("     "), false);
